@@ -1,0 +1,221 @@
+#!/bin/bash
+
+clean_exited() {
+	docker rm $(docker ps -qf status=exited)
+}
+
+del_stopped(){
+	local name=$1
+	local state=$(docker inspect --format "{{.State.Running}}" $name 2>/dev/null)
+
+	if [[ "$state" == "false" ]]; then
+		docker rm $name
+	fi
+}
+
+relies_on(){
+	local containers=$@
+
+	for container in $containers; do
+		local state=$(docker inspect --format "{{.State.Running}}" $container 2>/dev/null)
+
+		if [[ "$state" == "false" ]] || [[ "$state" == "" ]]; then
+			echo "$container is not running, starting it for you."
+			$container
+		fi
+	done
+}
+
+
+############
+
+
+chrome(){
+	del_stopped chrome
+
+	docker run -d \
+		--cpuset-cpus 0 \
+		--device /dev/snd \
+		--device /dev/dri \
+		--device /dev/video0 \
+		--memory 1gb \
+		--name chrome \
+		--net desktop \
+		--group-add audio \
+		--group-add video \
+		--security-opt seccomp:$HOME/docker-desktop/configs/chrome/seccomp/chrome.json \
+		-e DBUS_SESSION_BUS_ADDRESS \
+		-e DISPLAY \
+		-v /dev/shm:/dev/shm \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /run/user/$(id -u):/run/user/$(id -u) \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v /var/run/dbus:/var/run/dbus \
+		-v $HOME/Downloads:/root/Downloads \
+		-v $HOME/Pictures:/root/Pictures \
+		-v $HOME/Torrents:/root/Torrents \
+		-v $HOME/.chrome:/root/.config/google-chrome \
+		jess/chrome --user-data-dir=/root/.config/google-chrome $@
+}
+
+
+deluge() {
+	del_stopped deluge
+	docker run -d \
+		--name deluge \
+		-e DISPLAY \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		-v $HOME/.config/deluge:/root/.config/deluge \
+		-v $HOME/Torrents/:/root/Torrents \
+		somatorio/deluge-gtk
+}
+
+emulationstation() {
+	docker run -it --rm \
+		--device /dev/input \
+                --device /dev/snd \
+		-e DBUS_SESSION_BUS_ADDRESS \
+		-e DISPLAY \
+		-v /run/user/$(id -u):/run/user/$(id -u) \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		-v /var/run/dbus:/var/run/dbus \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v $HOME/.emulationstation:/root/.emulationstation \
+		-v $HOME/roms:/root/roms \
+		somatorio/emulationstation $@
+}
+
+firefox() {
+	del_stopped firefox
+	docker run -d \
+		--cpuset-cpus 0 \
+		--device /dev/snd \
+		--device /dev/dri \
+		--memory 1gb \
+		--name firefox \
+		--net desktop \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /dev/shm:/dev/shm \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $HOME/.firefox/cache:/root/.cache/mozilla \
+		-v $HOME/.firefox/mozilla:/root/.mozilla \
+		-v $HOME/.firefox/laspass:/root/.lastpass \
+		-v $HOME/Downloads:/root/Downloads \
+		jess/firefox "$@"
+}
+
+
+pulseaudio(){
+	del_stopped pulseaudio
+
+	docker run -d \
+		--device /dev/snd \
+		--group-add audio \
+		--name pulseaudio \
+		-p 4713:4713 \
+		-u pulseaudio:92 \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
+		jess/pulseaudio
+}
+
+remmina(){
+	del_stopped remmina
+
+	docker run -d \
+		--name remmina \
+		--net desktop \
+		-e DISPLAY \
+		-e GDK_SCALE \
+		-e GDK_DPI_SCALE \
+                -v /etc/localtime:/etc/localtime:ro \
+                -v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $HOME/.remmina:/root/.remmina \
+		jess/remmina
+}
+
+steam(){
+	del_stopped steam
+	relies_on pulseaudio
+
+	docker run -d \
+		--device /dev/dri \
+		--name steam \
+		--link pulseaudio:pulseaudio \
+		-e DBUS_SESSION_BUS_ADDRESS \
+		-e DISPLAY=unix$DISPLAY \
+		-e PULSE_SERVER=pulseaudio \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /etc/machine-id:/etc/machine-id:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v /var/run/dbus:/var/run/dbus \
+		-v /var/run/dbus:/var/run/dbus \
+		-v $HOME/.steam:/home/steam \
+		somatorio/steam $@
+}
+
+telegram() {
+	del_stopped telegram
+
+	docker run -d -it --name telegram \
+		--cpuset-cpus 1 \
+		--device /dev/snd \
+		--memory 100mb \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $HOME/.TelegramDesktop:/root/.TelegramDesktop \
+		-v $HOME/Downloads:/root/Downloads \
+		-v $HOME/Pictures:/root/Pictures \
+		xorilog/telegram
+}
+
+unzip() {
+	local=$(cd $(dirname $1);pwd)
+	docker run --rm -it \
+	-u $(id -u):$(id -g) \
+	-v $local:/root/zip \
+	-w /root/zip \
+	alpine:3.4 unzip $(basename $1)
+}
+
+vlc(){
+	del_stopped vlc
+	relies_on pulseaudio
+
+	docker run -d \
+		--device /dev/dri \
+		--name vlc \
+		--group-add audio \
+		--group-add video \
+		--link pulseaudio:pulseaudio \
+		-e DISPLAY=unix$DISPLAY \
+		-e GDK_SCALE \
+		-e GDK_DPI_SCALE \
+		-e QT_DEVICE_PIXEL_RATIO \
+		-e PULSE_SERVER=pulseaudio \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v /run/media/somatorio/Steam/downloads/:/home/vlc/Torrents \
+		jess/vlc
+}
+
+xfce4-screenshooter() {
+	del_stopped xfce4-screenshooter
+
+	docker run -d \
+		--name xfce4-screenshooter \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $HOME/Pictures:/root/Pictures \
+		somatorio/xfce4-screenshooter $@
+}
+
+
+if [ $1 ]; then
+  cmd=$1
+  shift
+  $cmd $@
+fi
