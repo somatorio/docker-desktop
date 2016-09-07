@@ -1,5 +1,11 @@
 #!/bin/bash
 
+check_network() {
+	if ! docker network inspect $1 > /dev/null 2>&1; then
+		docker network create $1
+	fi
+}
+
 clean_exited() {
 	docker rm $(docker ps -qf status=exited)
 }
@@ -108,11 +114,13 @@ firefox() {
 
 pulseaudio(){
 	del_stopped pulseaudio
+	check_network pulseaudio
 
 	docker run -d \
 		--device /dev/snd \
 		--group-add audio \
 		--name pulseaudio \
+		--net pulseaudio \
 		-p 4713:4713 \
 		-u pulseaudio:92 \
 		-v /etc/localtime:/etc/localtime:ro \
@@ -142,7 +150,7 @@ steam(){
 	docker run -d \
 		--device /dev/dri \
 		--name steam \
-		--link pulseaudio:pulseaudio \
+		--net pulseaudio \
 		-e DBUS_SESSION_BUS_ADDRESS \
 		-e DISPLAY=unix$DISPLAY \
 		-e PULSE_SERVER=pulseaudio \
@@ -187,9 +195,9 @@ vlc(){
 	docker run -d \
 		--device /dev/dri \
 		--name vlc \
+		--net pulseaudio \
 		--group-add audio \
 		--group-add video \
-		--link pulseaudio:pulseaudio \
 		-e DISPLAY=unix$DISPLAY \
 		-e GDK_SCALE \
 		-e GDK_DPI_SCALE \
@@ -197,7 +205,7 @@ vlc(){
 		-e PULSE_SERVER=pulseaudio \
 		-v /etc/localtime:/etc/localtime:ro \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v /run/media/somatorio/Steam/downloads/:/home/vlc/Torrents \
+		-v $HOME:/home/vlc/$(whoami) \
 		jess/vlc
 }
 
