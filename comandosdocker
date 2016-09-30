@@ -32,7 +32,9 @@ relies_on(){
 	done
 }
 
-
+stop_all() {
+	docker stop -f $(docker ps -q)
+}
 ############
 
 
@@ -160,7 +162,7 @@ steam(){
 		-v /var/run/dbus:/var/run/dbus \
 		-v /var/run/dbus:/var/run/dbus \
 		-v $HOME/.steam:/home/steam \
-		somatorio/steam $@
+		tianon/steam $@
 }
 
 telegram() {
@@ -179,6 +181,15 @@ telegram() {
 		xorilog/telegram
 }
 
+unrar() {
+	local=$(cd $(dirname $1);pwd)
+	docker run --rm -it \
+	-u $(id -u):$(id -g) \
+	-v $local:/root/zip \
+	-w /root/zip \
+	somatorio/unrar x $(basename $1)
+}
+
 unzip() {
 	local=$(cd $(dirname $1);pwd)
 	docker run --rm -it \
@@ -187,6 +198,7 @@ unzip() {
 	-w /root/zip \
 	alpine:3.4 unzip $(basename $1)
 }
+
 
 vlc(){
 	del_stopped vlc
@@ -207,6 +219,29 @@ vlc(){
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
 		-v $HOME:/home/vlc/$(whoami) \
 		jess/vlc
+}
+
+xchat() {
+	del_stopped xchat
+	
+	docker run -d \
+		--name xchat \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $HOME/.xchat:/home/xchat/config \
+		jamesnetherton/xchat
+}
+
+xchat-clone() {
+	del_stopped xchat
+	
+	docker run -d \
+		--name xchat \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		jamesnetherton/xchat
 }
 
 xfce4-screenshooter() {
