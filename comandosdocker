@@ -118,6 +118,16 @@ hugo() {
 	docker run --rm -it \
 	-v $(pwd):/src \
 	jojomi/hugo hugo $@
+}
+
+
+minecraft() {
+	docker run --rm \
+	    -e DISPLAY \
+	    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+	    --device /dev/snd/ \
+	    -v $HOME/.minecraft:/root/.minecraft \
+	    somatorio/minecraft-launcher
 } 
 
 pulseaudio(){
