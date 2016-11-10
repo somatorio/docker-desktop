@@ -38,6 +38,19 @@ stop_all() {
 ############
 
 
+atom() {
+	del_stopped atom
+
+	docker run -d \
+		--name atom \
+		-e DISPLAY \
+		-u 0:0 \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		-v /dev/shm:/dev/shm \
+		-v $HOME/.atom:/root/.atom \
+		jamesnetherton/docker-atom-editor
+}
+
 chrome(){
 	del_stopped chrome
 
@@ -129,6 +142,16 @@ minecraft() {
 	    -v $HOME/.minecraft:/root/.minecraft \
 	    somatorio/minecraft-launcher
 } 
+
+mysql-workbench() {
+	del_stopped mysql-workbench
+	docker run -d \
+		--name mysql-workbench \
+		-e DISPLAY \
+		-v $HOME/.mysql-workbench:/root/.mysql/workbench \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		jdecool/mysql-workbench
+}
 
 pulseaudio(){
 	del_stopped pulseaudio
