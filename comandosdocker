@@ -41,14 +41,22 @@ stop_all() {
 atom() {
 	del_stopped atom
 
+	if [ "$1" ]
+	then
+		local=$(cd $(dirname "$@");pwd)
+		MOUNT="-v $local:/workdir/"
+	fi
+
 	docker run -d \
 		--name atom \
 		-e DISPLAY \
 		-u 0:0 \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		-v /dev/shm:/dev/shm \
 		-v $HOME/.atom:/root/.atom \
-		jamesnetherton/docker-atom-editor
+		-v $HOME:/root/$(whoami)/ \
+		-v /dev/shm:/dev/shm \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		$MOUNT \
+		jamesnetherton/docker-atom-editor $(if [ "$1" ]; then echo "atom -f /workdir/$(basename "$@")";fi)
 }
 
 chrome(){
@@ -141,7 +149,7 @@ minecraft() {
 	    --device /dev/snd/ \
 	    -v $HOME/.minecraft:/root/.minecraft \
 	    somatorio/minecraft-launcher
-} 
+}
 
 mysql-workbench() {
 	del_stopped mysql-workbench
@@ -261,7 +269,7 @@ vlc(){
 
 xchat() {
 	del_stopped xchat
-	
+
 	docker run -d \
 		--name xchat \
 		-e DISPLAY \
@@ -273,7 +281,7 @@ xchat() {
 
 xchat-clone() {
 	del_stopped xchat
-	
+
 	docker run -d \
 		--name xchat \
 		-e DISPLAY \
