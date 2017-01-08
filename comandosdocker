@@ -33,10 +33,23 @@ relies_on(){
 }
 
 stop_all() {
-	docker stop -f $(docker ps -q)
+	docker stop $(docker ps -q)
 }
 ############
 
+audacity() {
+  del_stopped audacity
+
+	docker run -d \
+		--device /dev/snd \
+		--name audacity \
+		-e DISPLAY \
+		-e PULSE_SERVER=pulseaudio \
+		-v /tmp/.X11-unix:/tmp/.X11-unix/ \
+		-v $HOME:/root/$(whoami) \
+		-v $HOME/.audacity:/root/.audacity-data \
+		jess/audacity
+}
 
 atom() {
 	del_stopped atom
@@ -70,11 +83,13 @@ chrome(){
 		--memory 1gb \
 		--name chrome \
 		--net desktop \
+		--net pulseaudio \
 		--group-add audio \
 		--group-add video \
 		--security-opt seccomp:$HOME/docker-desktop/configs/chrome/seccomp/chrome.json \
 		-e DBUS_SESSION_BUS_ADDRESS \
 		-e DISPLAY \
+		-e PULSE_SERVER=pulseaudio \
 		-v /dev/shm:/dev/shm \
 		-v /etc/localtime:/etc/localtime:ro \
 		-v /run/user/$(id -u):/run/user/$(id -u) \
@@ -92,7 +107,10 @@ deluge() {
 	del_stopped deluge
 	docker run -d \
 		--name deluge \
+		--net host \
 		-e DISPLAY \
+		-p 58846:58846 \
+		-p 58946:58946 \
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 		-v $HOME/.config/deluge:/root/.config/deluge \
 		-v $HOME/Downloads/:/root/Downloads \
@@ -143,10 +161,12 @@ hugo() {
 
 
 minecraft() {
+	#I know that "--net host" is evil, but if you want to play lan hosted games, you'll need it
 	docker run --rm \
 	    -e DISPLAY \
 	    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 	    --device /dev/snd/ \
+	    --net host \
 	    -v $HOME/.minecraft:/root/.minecraft \
 	    somatorio/minecraft-launcher
 }
@@ -160,6 +180,25 @@ mysql-workbench() {
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 		jdecool/mysql-workbench
 }
+
+obs(){
+	del_stopped obs
+	relies_on pulseaudio
+	docker run -d \
+		--device /dev/video0 \
+		--device /dev/snd/ \
+		--name obs \
+		--net pulseaudio \
+		-e DISPLAY \
+		-e PULSE_SERVER=pulseaudio \
+		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+		-v $HOME:/root/$(whoami) \
+		-v $HOME/.obs:/root/.config/obs-studio \
+		somatorio/obs-studio
+}
+
+
+
 
 pulseaudio(){
 	del_stopped pulseaudio
@@ -218,11 +257,10 @@ telegram() {
 	docker run -d -it --name telegram \
 		--cpuset-cpus 1 \
 		--device /dev/snd \
-		--memory 100mb \
 		-e DISPLAY \
 		-v /etc/localtime:/etc/localtime:ro \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/.TelegramDesktop:/root/.TelegramDesktop \
+		-v $HOME/.TelegramDesktop:/root/.local/share/TelegramDesktop/ \
 		-v $HOME/Downloads:/root/Downloads \
 		-v $HOME/Pictures:/root/Pictures \
 		xorilog/telegram
@@ -302,6 +340,16 @@ xfce4-screenshooter() {
 		somatorio/xfce4-screenshooter $@
 }
 
+#wine() {
+#	docker run --rm \
+#		--device /dev/snd/ \
+#		--device /dev/dri \
+#		-e DISPLAY \
+#		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+#		-v $(pwd):/workdir \
+#		-w /workdir \
+#		tianon/wine wine $1
+#}
 
 if [ $1 ]; then
   cmd=$1
