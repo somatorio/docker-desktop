@@ -216,6 +216,11 @@ pulseaudio(){
 		jess/pulseaudio
 }
 
+pulseaudio-set-hdmi(){
+	docker exec pulseaudio /usr/bin/pactl load-module module-alsa-sink device=hw:0,3
+	docker exec pulseaudio /usr/bin/pacmd set-default-sink 1
+}
+
 remmina(){
 	del_stopped remmina
 
