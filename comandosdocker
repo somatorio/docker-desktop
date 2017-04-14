@@ -121,11 +121,11 @@ chrome(){
 		-v /run/user/$(id -u):/run/user/$(id -u) \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
 		-v /var/run/dbus:/var/run/dbus \
-		-v $HOME/Downloads:/root/Downloads \
-		-v $HOME/Pictures:/root/Pictures \
-		-v $HOME/Torrents:/root/Torrents \
-		-v $HOME/.chrome:/root/.config/google-chrome \
-		jess/chrome --user-data-dir=/root/.config/google-chrome $@
+		-v $HOME/Downloads:/home/chrome/Downloads \
+		-v $HOME/Pictures:/home/chrome/Pictures \
+		-v $HOME/Torrents:/home/chrome/Torrents \
+		-v $HOME/.chrome:/home/chrome/.config/google-chrome \
+		jess/chrome $@
 }
 
 
