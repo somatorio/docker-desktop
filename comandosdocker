@@ -217,13 +217,20 @@ obs(){
 		--net pulseaudio \
 		-e DISPLAY \
 		-e PULSE_SERVER=pulseaudio \
+		-e QT_DEVICE_PIXEL_RATIO \
 		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
 		-v $HOME:/root/$(whoami) \
 		-v $HOME/.obs:/root/.config/obs-studio \
 		somatorio/obs-studio
 }
 
-
+packettracer() {
+	docker run -it --rm \
+	       -e DISPLAY=unix$DISPLAY \
+	       -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+	       -v $HOME/pt:/root/pt \
+	       somatorio/packet-tracer
+}
 
 
 pulseaudio(){
