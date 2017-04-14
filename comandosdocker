@@ -37,6 +37,32 @@ stop_all() {
 }
 ############
 
+ansible() {
+	docker run -it --rm \
+		--entrypoint /usr/bin/ansible \
+		-v $(pwd):/code \
+		-v $HOME/.ssh:/root/.ssh \
+		-w /code \
+		dgmorales/ansible "$@"
+}
+
+ansible-playbook() {
+	docker run -it --rm \
+		-v $(pwd):/code \
+		-v $HOME/.ssh:/root/.ssh \
+		-w /code \
+		dgmorales/ansible "$@"
+}
+
+ansible-shell() {
+	docker run -it --rm \
+		--entrypoint /bin/bash \
+		-v $(pwd):/code \
+		-v $HOME/.ssh:/root/.ssh \
+		-w /code \
+		dgmorales/ansible "$@"
+}
+
 audacity() {
   del_stopped audacity
 
