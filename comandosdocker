@@ -366,6 +366,17 @@ xchat-clone() {
 		jamesnetherton/xchat
 }
 
+x11-alpine() {
+	docker run --rm -it \
+		-e DISPLAY \
+		-v /etc/localtime:/etc/localtime:ro \
+		-v /etc/machine-id:/etc/machine-id \
+		-v /var/run/dbus:/var/run/dbus \
+		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		alpine:3.4 sh
+}
+
+
 xfce4-screenshooter() {
 	del_stopped xfce4-screenshooter
 
