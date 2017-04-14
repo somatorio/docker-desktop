@@ -284,7 +284,6 @@ steam(){
 		-v /etc/machine-id:/etc/machine-id:ro \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
 		-v /var/run/dbus:/var/run/dbus \
-		-v /var/run/dbus:/var/run/dbus \
 		-v $HOME/.steam:/home/steam \
 		tianon/steam $@
 }
