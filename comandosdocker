@@ -1,403 +1,465 @@
 #!/bin/bash
+#
+#######
+# Highly based on https://github.com/jessfraz/dotfiles/blob/master/.dockerfunc
+#######
+
 
 check_network() {
-	if ! docker network inspect $1 > /dev/null 2>&1; then
-		docker network create $1
-	fi
+  if ! docker network inspect $1 > /dev/null 2>&1; then
+    docker network create $1
+  fi
 }
 
 clean_exited() {
-	docker rm $(docker ps -qf status=exited)
+  docker rm $(docker ps -qf status=exited)
 }
 
 del_stopped(){
-	local name=$1
-	local state=$(docker inspect --format "{{.State.Running}}" $name 2>/dev/null)
+  local name=$1
+  local state=$(docker inspect --format "{{.State.Running}}" $name 2>/dev/null)
 
-	if [[ "$state" == "false" ]]; then
-		docker rm $name
-	fi
+  if [[ "$state" == "false" ]]; then
+     docker rm $name
+  fi
 }
 
 relies_on(){
-	local containers=$@
+  local containers=$@
 
-	for container in $containers; do
-		local state=$(docker inspect --format "{{.State.Running}}" $container 2>/dev/null)
+  for container in $containers; do
+    local state=$(docker inspect --format "{{.State.Running}}" $container 2>/dev/null)
 
-		if [[ "$state" == "false" ]] || [[ "$state" == "" ]]; then
-			echo "$container is not running, starting it for you."
-			$container
-		fi
-	done
+    if [[ "$state" == "false" ]] || [[ "$state" == "" ]]; then
+      echo "$container is not running, starting it for you."
+      $container
+    fi
+  done
 }
 
 stop_all() {
-	docker stop $(docker ps -q)
+  docker stop $(docker ps -q)
 }
 ############
 
 ansible() {
-	docker run -it --rm \
-		--entrypoint /usr/bin/ansible \
-		-v $(pwd):/code \
-		-v $HOME/.ssh:/root/.ssh \
-		-w /code \
-		dgmorales/ansible "$@"
+  docker run -it --rm \
+    --entrypoint /usr/bin/ansible \
+    -v $(pwd):/code \
+    -v $HOME/.ssh:/root/.ssh \
+    -w /code \
+    dgmorales/ansible "$@"
 }
 
 ansible-playbook() {
-	docker run -it --rm \
-		-v $(pwd):/code \
-		-v $HOME/.ssh:/root/.ssh \
-		-w /code \
-		dgmorales/ansible "$@"
+  docker run -it --rm \
+    -v $(pwd):/code \
+    -v $HOME/.ssh:/root/.ssh \
+    -w /code \
+    dgmorales/ansible "$@"
 }
 
 ansible-shell() {
-	docker run -it --rm \
-		--entrypoint /bin/bash \
-		-v $(pwd):/code \
-		-v $HOME/.ssh:/root/.ssh \
-		-w /code \
-		dgmorales/ansible "$@"
+  docker run -it --rm \
+    --entrypoint /bin/bash \
+    -v $(pwd):/code \
+    -v $HOME/.ssh:/root/.ssh \
+    -w /code \
+    dgmorales/ansible "$@"
 }
 
 audacity() {
   del_stopped audacity
 
-	docker run -d \
-		--device /dev/snd \
-		--name audacity \
-		-e DISPLAY \
-		-e PULSE_SERVER=pulseaudio \
-		-v /tmp/.X11-unix:/tmp/.X11-unix/ \
-		-v $HOME:/root/$(whoami) \
-		-v $HOME/.audacity:/root/.audacity-data \
-		jess/audacity
+  docker run -d \
+    --device /dev/snd \
+    --name audacity \
+    -e DISPLAY \
+    -e PULSE_SERVER=pulseaudio \
+    -v /tmp/.X11-unix:/tmp/.X11-unix/ \
+    -v $HOME:/root/$(whoami) \
+    -v $HOME/.audacity:/root/.audacity-data \
+    jess/audacity
 }
 
 atom() {
-	del_stopped atom
+  del_stopped atom
 
-	if [ "$1" ]
-	then
-		local=$(cd $(dirname "$@");pwd)
-		MOUNT="-v $local:/workdir/"
-	fi
+  if [ "$1" ]
+  then
+    local=$(cd $(dirname "$@");pwd)
+    MOUNT="-v $local:/workdir/"
+  fi
 
-	docker run -d \
-		--name atom \
-		-e DISPLAY \
-		-u 0:0 \
-		-v $HOME/.atom:/root/.atom \
-		-v $HOME:/root/$(whoami)/ \
-		-v /dev/shm:/dev/shm \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		$MOUNT \
-		jamesnetherton/docker-atom-editor $(if [ "$1" ]; then echo "atom -f /workdir/$(basename "$@")";fi)
+  docker run -d \
+    --name atom \
+    -e DISPLAY \
+    -u 0:0 \
+    -v $HOME/.atom:/root/.atom \
+    -v $HOME:/root/$(whoami)/ \
+    -v /dev/shm:/dev/shm \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    $MOUNT \
+    jamesnetherton/docker-atom-editor $(if [ "$1" ]; then echo "atom -f /workdir/$(basename "$@")";fi)
 }
 
 chrome(){
-	del_stopped chrome
+  del_stopped chrome
+  relies_on pulseaudio
 
-	docker run -d \
-		--cpuset-cpus 0 \
-		--device /dev/snd \
-		--device /dev/dri \
-		--device /dev/video0 \
-		--memory 1gb \
-		--name chrome \
-		--net desktop \
-		--net pulseaudio \
-		--group-add audio \
-		--group-add video \
-		--security-opt seccomp:$HOME/docker-desktop/configs/chrome/seccomp/chrome.json \
-		-e DBUS_SESSION_BUS_ADDRESS \
-		-e DISPLAY \
-		-e PULSE_SERVER=pulseaudio \
-		-v /dev/shm:/dev/shm \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /run/user/$(id -u):/run/user/$(id -u) \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v /var/run/dbus:/var/run/dbus \
-		-v $HOME/Downloads:/home/chrome/Downloads \
-		-v $HOME/Pictures:/home/chrome/Pictures \
-		-v $HOME/Torrents:/home/chrome/Torrents \
-		-v $HOME/.chrome:/home/chrome/.config/google-chrome \
-		jess/chrome $@
+  docker run -d \
+    --cpuset-cpus 0 \
+    --device /dev/snd \
+    --device /dev/dri \
+    --device /dev/video0 \
+    --memory 1gb \
+    --name chrome \
+    --net desktop \
+    --net pulseaudio \
+    --group-add audio \
+    --group-add video \
+    --security-opt seccomp:$HOME/docker-desktop/configs/chrome/seccomp/chrome.json \
+    -e DBUS_SESSION_BUS_ADDRESS \
+    -e DISPLAY \
+    -e PULSE_SERVER=pulseaudio \
+    -v /dev/shm:/dev/shm \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /run/user/$(id -u):/run/user/$(id -u) \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v /var/run/dbus:/var/run/dbus \
+    -v $HOME/Downloads:/home/chrome/Downloads \
+    -v $HOME/Pictures:/home/chrome/Pictures \
+    -v $HOME/Torrents:/home/chrome/Torrents \
+    -v $HOME/.chrome:/home/chrome/.config/google-chrome \
+    jess/chrome $@
 }
 
 
 deluge() {
-	del_stopped deluge
-	docker run -d \
-		--name deluge \
-		--net host \
-		-e DISPLAY \
-		-p 58846:58846 \
-		-p 58946:58946 \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		-v $HOME/.config/deluge:/root/.config/deluge \
-		-v $HOME/Downloads/:/root/Downloads \
-		-v $HOME/Torrents/:/root/Torrents \
-		somatorio/deluge-gtk
+  del_stopped deluge
+  docker run -d \
+    --name deluge \
+    --net host \
+    -e DISPLAY \
+    -p 58846:58846 \
+    -p 58946:58946 \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v $HOME/.config/deluge:/root/.config/deluge \
+    -v $HOME/Downloads/:/root/Downloads \
+    -v $HOME/Torrents/:/root/Torrents \
+    somatorio/deluge-gtk
 }
 
 emulationstation() {
-	docker run -it --rm \
-		--device /dev/input \
-                --device /dev/snd \
-		-e DBUS_SESSION_BUS_ADDRESS \
-		-e DISPLAY \
-		-v /run/user/$(id -u):/run/user/$(id -u) \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		-v /var/run/dbus:/var/run/dbus \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v $HOME/.emulationstation:/root/.emulationstation \
-		-v $HOME/roms:/root/roms \
-		somatorio/emulationstation $@
+  docker run -it --rm \
+    --device /dev/input \
+    --device /dev/snd \
+    -e DBUS_SESSION_BUS_ADDRESS \
+    -e DISPLAY \
+    -v /run/user/$(id -u):/run/user/$(id -u) \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v /var/run/dbus:/var/run/dbus \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v $HOME/.emulationstation:/root/.emulationstation \
+    -v $HOME/roms:/root/roms \
+    somatorio/emulationstation $@
 }
 
 firefox() {
-	del_stopped firefox
-	docker run -d \
-		--cpuset-cpus 0 \
-		--device /dev/snd \
-		--device /dev/dri \
-		--memory 1gb \
-		--name firefox \
-		--net desktop \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /dev/shm:/dev/shm \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/.firefox/cache:/root/.cache/mozilla \
-		-v $HOME/.firefox/mozilla:/root/.mozilla \
-		-v $HOME/.firefox/laspass:/root/.lastpass \
-		-v $HOME/Downloads:/root/Downloads \
-		jess/firefox "$@"
+  del_stopped firefox
+  docker run -d \
+    --cpuset-cpus 0 \
+    --device /dev/snd \
+    --device /dev/dri \
+    --memory 1gb \
+    --name firefox \
+    --net desktop \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /dev/shm:/dev/shm \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/.firefox/cache:/root/.cache/mozilla \
+    -v $HOME/.firefox/mozilla:/root/.mozilla \
+    -v $HOME/.firefox/laspass:/root/.lastpass \
+    -v $HOME/Downloads:/root/Downloads \
+    jess/firefox "$@"
+}
+
+gimp() {
+  docker container run -d \
+    -e DISPLAY \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v /home/$(whoami):/root/$(whoami) \
+    jess/gimp
 }
 
 hugo() {
-	docker run --rm -it \
-	-v $(pwd):/src \
-	jojomi/hugo hugo $@
+  docker run --rm -it \
+    -v $(pwd):/src \
+    jojomi/hugo hugo $@
 }
 
 
 minecraft() {
-	#I know that "--net host" is evil, but if you want to play lan hosted games, you'll need it
-	docker run --rm \
-	    -e DISPLAY \
-	    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-	    --device /dev/snd/ \
-	    --net host \
-	    -v $HOME/.minecraft:/root/.minecraft \
-	    somatorio/minecraft-launcher
+  #I know that "--net host" is evil, but if you want to play lan hosted games, you'll need it
+  docker run --rm \
+    -e DISPLAY \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    --device /dev/snd/ \
+    --net host \
+    -v $HOME/.minecraft:/root/.minecraft \
+    somatorio/minecraft-launcher
 }
 
 mysql-workbench() {
-	del_stopped mysql-workbench
-	docker run -d \
-		--name mysql-workbench \
-		-e DISPLAY \
-		-v $HOME/.mysql-workbench:/root/.mysql/workbench \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		jdecool/mysql-workbench
+  del_stopped mysql-workbench
+  docker run -d \
+    --name mysql-workbench \
+    -e DISPLAY \
+    -v $HOME/.mysql-workbench:/root/.mysql/workbench \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    jdecool/mysql-workbench
 }
 
 obs(){
-	del_stopped obs
-	relies_on pulseaudio
-	docker run -d \
-		--device /dev/video0 \
-		--device /dev/snd/ \
-		--name obs \
-		--net pulseaudio \
-		-e DISPLAY \
-		-e PULSE_SERVER=pulseaudio \
-		-e QT_DEVICE_PIXEL_RATIO \
-		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-		-v $HOME:/root/$(whoami) \
-		-v $HOME/.obs:/root/.config/obs-studio \
-		somatorio/obs-studio
+  del_stopped obs
+  relies_on pulseaudio
+  docker run -d \
+    --device /dev/video0 \
+    --device /dev/snd/ \
+    --name obs \
+    --net pulseaudio \
+    -e DISPLAY \
+    -e PULSE_SERVER=pulseaudio \
+    -e QT_DEVICE_PIXEL_RATIO \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v $HOME:/root/$(whoami) \
+    -v $HOME/.obs:/root/.config/obs-studio \
+    somatorio/obs-studio
 }
 
 packettracer() {
-	docker run -it --rm \
-	       -e DISPLAY=unix$DISPLAY \
-	       -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-	       -v $HOME/pt:/root/pt \
-	       somatorio/packet-tracer
+  docker run -it --rm \
+    -e DISPLAY=unix$DISPLAY \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v $HOME/pt:/root/pt \
+    somatorio/packet-tracer
 }
 
+plex() {
+  del_stopped plex
+  docker run -d \
+    --name plex \
+    --net=host \
+    -e TZ="America/Sao_Paulo"  \
+    -v $HOME/.plex/config:/config \
+    -v $HOME/.plex/temp:/transcode \
+    -v $HOME/.plex/data:/data \
+    -v $HOME:/$(whoami) \
+    plexinc/pms-docker
+}
 
 pulseaudio(){
-	del_stopped pulseaudio
-	check_network pulseaudio
+  del_stopped pulseaudio
+  check_network pulseaudio
 
-	docker run -d \
-		--device /dev/snd \
-		--group-add audio \
-		--name pulseaudio \
-		--net pulseaudio \
-		-p 4713:4713 \
-		-u pulseaudio:92 \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
-		jess/pulseaudio
+  docker run -d \
+    --device /dev/snd \
+    --group-add audio \
+    --name pulseaudio \
+    --net pulseaudio \
+    -p 4713:4713 \
+    -u pulseaudio:92 \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
+    jess/pulseaudio
 }
 
 pulseaudio-set-hdmi(){
-	docker exec pulseaudio /usr/bin/pactl load-module module-alsa-sink device=hw:0,3
-	docker exec pulseaudio /usr/bin/pacmd set-default-sink 1
+  docker exec pulseaudio /usr/bin/pactl load-module module-alsa-sink device=hw:0,3
+  docker exec pulseaudio /usr/bin/pacmd set-default-sink 1
 }
 
 remmina(){
-	del_stopped remmina
+  del_stopped remmina
 
-	docker run -d \
-		--name remmina \
-		--net desktop \
-		-e DISPLAY \
-		-e GDK_SCALE \
-		-e GDK_DPI_SCALE \
-                -v /etc/localtime:/etc/localtime:ro \
-                -v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/.remmina:/root/.remmina \
-		jess/remmina
+  check_network desktop
+
+  docker run -d \
+    --name remmina \
+    --net desktop \
+    -e DISPLAY \
+    -e GDK_SCALE \
+    -e GDK_DPI_SCALE \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/.remmina:/root/.remmina \
+    jess/remmina "$@"
 }
 
 steam(){
-	del_stopped steam
-	relies_on pulseaudio
+  del_stopped steam
+  relies_on pulseaudio
 
-	docker run -d \
-		--device /dev/dri \
-		--name steam \
-		--net pulseaudio \
-		-e DBUS_SESSION_BUS_ADDRESS \
-		-e DISPLAY=unix$DISPLAY \
-		-e PULSE_SERVER=pulseaudio \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /etc/machine-id:/etc/machine-id:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v /var/run/dbus:/var/run/dbus \
-		-v $HOME/.steam:/home/steam \
-		tianon/steam $@
+  docker run -d \
+    --device /dev/dri \
+    --name steam \
+    --net pulseaudio \
+    -e DBUS_SESSION_BUS_ADDRESS \
+    -e DISPLAY=unix$DISPLAY \
+    -e PULSE_SERVER=pulseaudio \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /etc/machine-id:/etc/machine-id:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v /var/run/dbus:/var/run/dbus \
+    -v $HOME/.steam:/home/steam \
+    tianon/steam $@
+}
+
+skype() {
+  del_stopped skype
+
+  docker container run -d \
+    --device /dev/snd \
+    --device /dev/video0 \
+    --name skype \
+    -e DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    jess/skype
+}
+
+skype2() {
+  del_stopped skype
+  relies_on pulseaudio
+
+  docker run -d \
+    --device /dev/video0 \
+    --group-add video \
+    --group-add audio \
+    --name skype \
+    --net pulseaudio \
+    --security-opt seccomp:unconfined \
+    -e "DISPLAY=unix${DISPLAY}" \
+    -e PULSE_SERVER=pulseaudio \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    jess/skype
 }
 
 telegram() {
-	del_stopped telegram
+  del_stopped telegram
 
-	docker run -d -it --name telegram \
-		--cpuset-cpus 1 \
-		--device /dev/snd \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/.TelegramDesktop:/root/.local/share/TelegramDesktop/ \
-		-v $HOME/Downloads:/root/Downloads \
-		-v $HOME/Pictures:/root/Pictures \
-		xorilog/telegram
+  docker run -d -it --name telegram \
+    --cpuset-cpus 1 \
+    --device /dev/snd \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/.TelegramDesktop:/root/.local/share/TelegramDesktop/ \
+    -v $HOME/Downloads:/root/Downloads \
+    -v $HOME/Pictures:/root/Pictures \
+    xorilog/telegram
 }
 
 unrar() {
-	local=$(cd $(dirname $1);pwd)
-	docker run --rm -it \
-	-u $(id -u):$(id -g) \
-	-v $local:/work \
-	senk/unrar e $(basename $1)
+  local=$(cd $(dirname $1);pwd)
+  docker run --rm -it \
+    -u $(id -u):$(id -g) \
+    -v $local:/work \
+    senk/unrar e $(basename $1)
 }
 
 unzip() {
-	local=$(cd $(dirname $1);pwd)
-	docker run --rm -it \
-	-u $(id -u):$(id -g) \
-	-v $local:/root/zip \
-	-w /root/zip \
-	alpine:3.4 unzip $(basename $1)
+  local=$(cd $(dirname $1);pwd)
+  docker run --rm -it \
+    -u $(id -u):$(id -g) \
+    -v $local:/root/zip \
+    -w /root/zip \
+    alpine:3.4 unzip $(basename $1)
 }
 
 
 vlc(){
-	del_stopped vlc
-	relies_on pulseaudio
+  del_stopped vlc
+  relies_on pulseaudio
 
-	docker run -d \
-		--device /dev/dri \
-		--name vlc \
-		--net pulseaudio \
-		--group-add audio \
-		--group-add video \
-		-e DISPLAY=unix$DISPLAY \
-		-e GDK_SCALE \
-		-e GDK_DPI_SCALE \
-		-e QT_DEVICE_PIXEL_RATIO \
-		-e PULSE_SERVER=pulseaudio \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME:/home/vlc/$(whoami) \
-		jess/vlc
+  docker run -d \
+    --device /dev/dri \
+    --name vlc \
+    --net pulseaudio \
+    --group-add audio \
+    --group-add video \
+    -e DISPLAY=unix$DISPLAY \
+    -e GDK_SCALE \
+    -e GDK_DPI_SCALE \
+    -e QT_DEVICE_PIXEL_RATIO \
+    -e PULSE_SERVER=pulseaudio \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME:/home/vlc/$(whoami) \
+    jess/vlc
 }
 
 xchat() {
-	del_stopped xchat
+  del_stopped xchat
 
-	docker run -d \
-		--name xchat \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/.xchat:/home/xchat/config \
-		jamesnetherton/xchat
+  docker run -d \
+    --name xchat \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/.xchat:/home/xchat/config \
+    jamesnetherton/xchat
 }
 
 xchat-clone() {
-	del_stopped xchat
+  del_stopped xchat
 
-	docker run -d \
-		--name xchat \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		jamesnetherton/xchat
+  docker run -d \
+    --name xchat \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    jamesnetherton/xchat
 }
 
 x11-alpine() {
-	docker run --rm -it \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /etc/machine-id:/etc/machine-id \
-		-v /var/run/dbus:/var/run/dbus \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		alpine:3.4 sh
+  docker run --rm -it \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /etc/machine-id:/etc/machine-id \
+    -v /var/run/dbus:/var/run/dbus \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    alpine:3.4 sh
 }
 
 
 xfce4-screenshooter() {
-	del_stopped xfce4-screenshooter
+  del_stopped xfce4-screenshooter
 
-	docker run -d \
-		--name xfce4-screenshooter \
-		-e DISPLAY \
-		-v /etc/localtime:/etc/localtime:ro \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		-v $HOME/Pictures:/root/Pictures \
-		somatorio/xfce4-screenshooter $@
+  docker run -d \
+    --name xfce4-screenshooter \
+    -e DISPLAY \
+    -v /etc/localtime:/etc/localtime:ro \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $HOME/Pictures:/root/Pictures \
+    somatorio/xfce4-screenshooter $@
 }
 
-#wine() {
-#	docker run --rm \
-#		--device /dev/snd/ \
-#		--device /dev/dri \
-#		-e DISPLAY \
-#		-v /tmp/.X11-unix/:/tmp/.X11-unix/ \
-#		-v $(pwd):/workdir \
-#		-w /workdir \
-#		tianon/wine wine $1
-#}
+wine() {
+  docker run --rm -it \
+    --device /dev/snd/ \
+    --device /dev/dri \
+    -e DISPLAY \
+    -e GDK_SCALE \
+    -e GDK_DPI_SCALE \
+    -e QT_DEVICE_PIXEL_RATIO \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $(pwd):/workdir \
+    -v $HOME/.config/wine:/root/.wine \
+    -w /workdir \
+    somatorio/wine wine "$@"
+}
 
 if [ $1 ]; then
   cmd=$1
