@@ -186,7 +186,10 @@ firefox() {
 }
 
 gimp() {
+  del_stopped gimp
+
   docker container run -d \
+    --name gimp \
     -e DISPLAY \
     -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
     -v /home/$(whoami):/root/$(whoami) \
@@ -199,6 +202,16 @@ hugo() {
     jojomi/hugo hugo $@
 }
 
+inkscape() {
+  del_stopped inkscape
+
+  docker container run -d \
+    --name inkscape \
+    -e DISPLAY \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/  \
+    -v /home/$(whoami):/root/$(whoami) \
+    jess/inkscape
+}
 
 minecraft() {
   #I know that "--net host" is evil, but if you want to play lan hosted games, you'll need it
