@@ -40,24 +40,23 @@ relies_on(){
 stop_all() {
   docker stop $(docker ps -q)
 }
-############
 
-ansible() {
-  docker run -it --rm \
-    --entrypoint /usr/bin/ansible \
-    -v $(pwd):/code \
-    -v $HOME/.ssh:/root/.ssh \
-    -w /code \
-    dgmorales/ansible "$@"
+get_gid() {
+	getent group $1 | cut -d: -f3
 }
+############
 
 ansible-playbook() {
   docker run -it --rm \
-    -v $(pwd):/code \
+    --entrypoint ansible-playbook \
+    -v $(pwd):/work \
     -v $HOME/.ssh:/root/.ssh \
-    -w /code \
-    dgmorales/ansible "$@"
+    -w /work \
+    williamyeh/ansible:alpine3 "$@"
 }
+
+# docker run --entrypoint ansible-playbook --rm -it -v $HOME/.ssh:/root/.ssh -v $(pwd):/work -w /work williamyeh/ansible:alpine3 --check -i hosts playbook.yml
+
 
 ansible-shell() {
   docker run -it --rm \
@@ -108,7 +107,7 @@ chrome(){
   relies_on pulseaudio
 
   docker run -d \
-    --cpuset-cpus 0 \
+    --cpuset-cpus 2,3 \
     --device /dev/snd \
     --device /dev/dri \
     --device /dev/video0 \
@@ -116,21 +115,22 @@ chrome(){
     --name chrome \
     --net desktop \
     --net pulseaudio \
-    --group-add audio \
-    --group-add video \
+    --group-add $(get_gid audio) \
+    --group-add $(get_gid video) \
     --security-opt seccomp:$HOME/docker-desktop/configs/chrome/seccomp/chrome.json \
     -e DBUS_SESSION_BUS_ADDRESS \
     -e DISPLAY \
     -e PULSE_SERVER=pulseaudio \
     -v /dev/shm:/dev/shm \
-    -v /etc/localtime:/etc/localtime:ro \
+    -v /usr/share/zoneinfo/America/Sao_Paulo:/etc/localtime:ro \
     -v /run/user/$(id -u):/run/user/$(id -u) \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v /var/run/dbus:/var/run/dbus \
+    -v /run/user/1000/bus:/run/user/1000/bus \
     -v $HOME/Downloads:/home/chrome/Downloads \
     -v $HOME/Pictures:/home/chrome/Pictures \
     -v $HOME/Torrents:/home/chrome/Torrents \
-    -v $HOME/.chrome:/home/chrome/.config/google-chrome \
+    -v $HOME/.chrome:/data \
     jess/chrome $@
 }
 
@@ -166,6 +166,8 @@ emulationstation() {
 }
 
 firefox() {
+  relies_on pulseaudio
+  
   del_stopped firefox
   docker run -d \
     --cpuset-cpus 0 \
@@ -173,8 +175,9 @@ firefox() {
     --device /dev/dri \
     --memory 1gb \
     --name firefox \
-    --net desktop \
+    --net pulseaudio \
     -e DISPLAY \
+    -e PULSE_SERVER=pulseaudio \
     -v /etc/localtime:/etc/localtime:ro \
     -v /dev/shm:/dev/shm \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
@@ -193,6 +196,7 @@ gimp() {
     -e DISPLAY \
     -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
     -v /home/$(whoami):/root/$(whoami) \
+    -v /usr/share/fonts/:/usr/share/fonts/ \
     jess/gimp
 }
 
@@ -210,16 +214,17 @@ inkscape() {
     -e DISPLAY \
     -v /tmp/.X11-unix/:/tmp/.X11-unix/  \
     -v /home/$(whoami):/root/$(whoami) \
+    -v /usr/share/fonts/:/usr/share/fonts/ \
     jess/inkscape
 }
 
 minecraft() {
   #I know that "--net host" is evil, but if you want to play lan hosted games, you'll need it
   docker run --rm \
-    -e DISPLAY \
-    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
     --device /dev/snd/ \
     --net host \
+    -e DISPLAY \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
     -v $HOME/.minecraft:/root/.minecraft \
     somatorio/minecraft-launcher
 }
@@ -310,17 +315,32 @@ remmina(){
     jess/remmina "$@"
 }
 
+retropie() {
+  docker run --rm -it \
+    --device /dev/input \
+    --group-add 97 \
+    --group-add 92 \
+    -e DISPLAY \
+    -e DBUS_SESSION_BUS_ADDRESS \
+    -v $HOME/retropie/:/workdir \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v /etc/machine-id:/etc/machine-id \
+    -v /var/run/dbus:/var/run/dbus \
+    somatorio/retropie bash
+}
+
 steam(){
   del_stopped steam
   relies_on pulseaudio
 
   docker run -d \
     --device /dev/dri \
+    --device /dev/input \
     --name steam \
     --net pulseaudio \
+    -e PULSE_SERVER=pulseaudio \
     -e DBUS_SESSION_BUS_ADDRESS \
     -e DISPLAY=unix$DISPLAY \
-    -e PULSE_SERVER=pulseaudio \
     -v /etc/localtime:/etc/localtime:ro \
     -v /etc/machine-id:/etc/machine-id:ro \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
@@ -336,7 +356,7 @@ skype() {
     --device /dev/snd \
     --device /dev/video0 \
     --name skype \
-    -e DISPLAY \
+    -e DISPLAY=unix$DISPLAY \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     jess/skype
 }
@@ -364,13 +384,14 @@ telegram() {
 
   docker run -d -it --name telegram \
     --cpuset-cpus 1 \
-    --device /dev/snd \
     -e DISPLAY \
+    -e DBUS_SESSION_BUS_ADDRESS \
     -v /etc/localtime:/etc/localtime:ro \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -v $HOME/.TelegramDesktop:/root/.local/share/TelegramDesktop/ \
-    -v $HOME/Downloads:/root/Downloads \
-    -v $HOME/Pictures:/root/Pictures \
+    -v /run/user/1000/bus:/run/user/1000/bus \
+    -v $HOME/.TelegramDesktop:/home/user/.local/share/TelegramDesktop/ \
+    -v $HOME/Downloads:/home/user/Downloads \
+    -v $HOME/Pictures:/home/user/Pictures \
     xorilog/telegram
 }
 
@@ -386,8 +407,8 @@ unzip() {
   local=$(cd $(dirname $1);pwd)
   docker run --rm -it \
     -u $(id -u):$(id -g) \
-    -v $local:/root/zip \
-    -w /root/zip \
+    -v $local:/workdir/zip \
+    -w /workdir/zip \
     alpine:3.4 unzip $(basename $1)
 }
 
@@ -411,6 +432,28 @@ vlc(){
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v $HOME:/home/vlc/$(whoami) \
     jess/vlc
+}
+
+vscode() {
+   del_stopped vscode
+
+  if [ "$1" ]
+  then
+    local=$(cd $(dirname "$@");pwd)
+    MOUNT="-v $local:/workdir/"
+  fi
+
+  docker run -d \
+    --device /dev/dri \
+    --name vscode \
+    -e DISPLAY \
+    -v $HOME:/home/user \
+    -v /dev/shm:/dev/shm \
+    -v /tmp/.X11-unix/:/tmp/.X11-unix/ \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    $MOUNT \
+    jess/vscode # $(if [ "$1" ]; then echo "vscode -f /workdir/$(basename "$@")";fi)
+   
 }
 
 xchat() {
